@@ -58,8 +58,7 @@ def requests_retry_session(
 def log_failed_http_request(endpoint, response, status_code):
     if not is_success_request(status_code):
         msg = 'Http {} | Error-{} : {}'.format(endpoint, status_code, response)
-        from app import app
-        app.logger.error(msg)
+        print('Error raised ', msg)
 
 
 def is_success_request(status_code):
