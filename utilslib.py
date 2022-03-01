@@ -4,6 +4,7 @@ from enums import HttpMethodEnum
 import json
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from mysql_mgr import *
 
 
 def invoke_http_request(endpoint, method, headers, payload=None, json_data=None, timeout=61):
