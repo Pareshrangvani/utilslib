@@ -6,6 +6,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from mysql_mgr import *
 from datetime import datetime, date, timedelta
+import dateutil.parser as parser
 
 def invoke_http_request(endpoint, method, headers, payload=None, json_data=None, timeout=61):
     """ here two exception block. one is for request exception and other is for json decoder exception.
@@ -101,3 +102,7 @@ def date_within_last(date, number, period):
 
 def str_to_datetime(date_time, str_format="%Y-%m-%d %H:%M:%S"):
     return datetime.strptime(date_time, str_format)
+
+def get_datetime(date_string):
+    """ this function will return datetime object with 2022-01-10 00:00:00 format"""
+    return parser.parse(date_string)
