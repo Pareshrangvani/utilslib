@@ -75,29 +75,29 @@ ops = {
     'date_within_last': lambda data, a, b, c: date_within_last(a, b, c),
     'date_after': lambda data, a, b: str_to_datetime(a) > str_to_datetime(b),
     'date_before': lambda data, a, b: str_to_datetime(a) < str_to_datetime(b),
-    'date_yesterday': lambda data, a: str_to_datetime(a).date() == date.today() - timedelta(days=1),
-    'date_today': lambda data, a: str_to_datetime(a).date() == date.today(),
-    'date_tomorrow': lambda data, a: str_to_datetime(a).date() == date.today() + timedelta(days=1),
+    'date_yesterday': lambda data, a: str_to_datetime(a).date() == datetime.utcnow().date() - timedelta(days=1),
+    'date_today': lambda data, a: str_to_datetime(a).date() == datetime.utcnow().date(),
+    'date_tomorrow': lambda data, a: str_to_datetime(a).date() == datetime.utcnow().date() + timedelta(days=1),
     'date_is_empty': lambda data, a: a == ""
 }
 
 
 def date_within_next(date, number, period):
     if period == "days":
-        return datetime.now() <= str_to_datetime(date) <= (
-                datetime.now() + timedelta(days=int(number)))
+        return datetime.utcnow() <= str_to_datetime(date) <= (
+                datetime.utcnow() + timedelta(days=int(number)))
     elif period == "weeks":
-        return datetime.now() <= str_to_datetime(date) <= (
-                datetime.now() + timedelta(weeks=int(number)))
+        return datetime.utcnow() <= str_to_datetime(date) <= (
+                datetime.utcnow() + timedelta(weeks=int(number)))
 
 
 def date_within_last(date, number, period):
     if period == "days":
-        return (datetime.now() - timedelta(
-            days=int(number))) <= str_to_datetime(date) <= datetime.now()
+        return (datetime.utcnow() - timedelta(
+            days=int(number))) <= str_to_datetime(date) <= datetime.utcnow()
     elif period == "weeks":
-        return (datetime.now() - timedelta(
-            weeks=int(number))) <= str_to_datetime(date) <= datetime.now()
+        return (datetime.utcnow() - timedelta(
+            weeks=int(number))) <= str_to_datetime(date) <= datetime.utcnow()
 
 
 def str_to_datetime(date_time, str_format="%Y-%m-%d %H:%M:%S"):
