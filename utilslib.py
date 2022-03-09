@@ -7,6 +7,11 @@ from urllib3.util.retry import Retry
 from mysql_mgr import *
 from datetime import datetime, date, timedelta
 import dateutil.parser as parser
+import string
+import random
+import shortuuid
+DT_FMT_HMSf = '%H%M%S%f'
+
 
 def invoke_http_request(endpoint, method, headers, payload=None, json_data=None, timeout=61):
     """ here two exception block. one is for request exception and other is for json decoder exception.
@@ -66,21 +71,6 @@ def log_failed_http_request(endpoint, response, status_code):
 def is_success_request(status_code):
     return 200 <= status_code <= 299
 
-ops = {
-    **BUILTINS,
-    'starts_with': lambda data, a, b: a.startswith(b),
-    'ends_with': lambda data, a, b: a.endswith(b),
-    'date_between': lambda data, a, b, c: str_to_datetime(b) <= str_to_datetime(a) <= str_to_datetime(c),
-    'date_within_next': lambda data, a, b, c: date_within_next(a, b, c),
-    'date_within_last': lambda data, a, b, c: date_within_last(a, b, c),
-    'date_after': lambda data, a, b: str_to_datetime(a) > str_to_datetime(b),
-    'date_before': lambda data, a, b: str_to_datetime(a) < str_to_datetime(b),
-    'date_yesterday': lambda data, a: str_to_datetime(a).date() == datetime.utcnow().date() - timedelta(days=1),
-    'date_today': lambda data, a: str_to_datetime(a).date() == datetime.utcnow().date(),
-    'date_tomorrow': lambda data, a: str_to_datetime(a).date() == datetime.utcnow().date() + timedelta(days=1),
-    'date_is_empty': lambda data, a: a == ""
-}
-
 
 def date_within_next(date, number, period):
     if period == "days":
@@ -103,6 +93,39 @@ def date_within_last(date, number, period):
 def str_to_datetime(date_time, str_format="%Y-%m-%d %H:%M:%S"):
     return datetime.strptime(date_time, str_format)
 
+
 def get_datetime(date_string):
     """ this function will return datetime object with 2022-01-10 00:00:00 format"""
     return parser.parse(date_string)
+
+
+def get_unique_key():
+    """
+    This method is used to get 32 bit unique key
+    Steps:
+        1. Get current timestamp in "%H%M%S%f" string format
+        2. Select random string of 8 char and add with timestamp
+        3. Generate 12 bit random string using shortuuid
+    :return: 32 bit Unique key
+    """
+
+    timestamp = datetime.now().strftime(DT_FMT_HMSf)
+    random_str = timestamp + ''.join(random.choice(string.digits + string.ascii_letters) for _ in range(8))
+    uuid_str = shortuuid.ShortUUID().random(length=12)
+    return '{}{}'.format(uuid_str, random_str)
+
+
+ops = {
+    **BUILTINS,
+    'starts_with': lambda data, a, b: a.startswith(b),
+    'ends_with': lambda data, a, b: a.endswith(b),
+    'date_between': lambda data, a, b, c: str_to_datetime(b) <= str_to_datetime(a) <= str_to_datetime(c),
+    'date_within_next': lambda data, a, b, c: date_within_next(a, b, c),
+    'date_within_last': lambda data, a, b, c: date_within_last(a, b, c),
+    'date_after': lambda data, a, b: str_to_datetime(a) > str_to_datetime(b),
+    'date_before': lambda data, a, b: str_to_datetime(a) < str_to_datetime(b),
+    'date_yesterday': lambda data, a: str_to_datetime(a).date() == datetime.utcnow().date() - timedelta(days=1),
+    'date_today': lambda data, a: str_to_datetime(a).date() == datetime.utcnow().date(),
+    'date_tomorrow': lambda data, a: str_to_datetime(a).date() == datetime.utcnow().date() + timedelta(days=1),
+    'date_is_empty': lambda data, a: a == ""
+}
