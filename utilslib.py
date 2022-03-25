@@ -226,7 +226,7 @@ def trigger_workflow(workflow, event_type, data, service_url):
 
 
 def json_logic_replace_data(rule, data, string_data=None, json_data=None):
-    replace_data = jsonLogic(rule, data)
+    replace_data = jsonLogic(rule, data, ops)
     it = iter(replace_data)
     res_dct = dict(zip(it, it))
 
@@ -432,3 +432,51 @@ def invoke_set_value_task(conf, set_value_configs, vtiger_access):
 
         set_value_response = trigger_set_value_task(set_value_fields, conf, rule, session_name, vtiger_access)
         return set_value_response
+
+
+def invoke_web_service_task(conf, web_service_configs):
+    """ Web service task:
+        params:
+        1. conf: conf object
+        2. web_service_configs: json object containing web service task configurations
+
+        Execution:
+        1. get request object and rule from conf
+        2. replace data using json_logic
+        3. get request parameters and invoke http request"""
+
+    rule = web_service_configs.get('rule', '')
+    request_object = web_service_configs.get('request_object', '')
+
+    json_logic_replace_data(rule, conf, json_data=request_object)
+
+    if request_object and rule:
+
+        request_object = json_logic_replace_data(rule, conf, json_data=request_object)
+        url = request_object.get("url")
+        headers = request_object.get("header")
+        request_type = request_object.get("type")
+        payload = request_object.get("payload")
+
+        if payload:
+            response, status = invoke_http_request(url, request_type, headers, payload)
+        else:
+            response, status = invoke_http_request(url, request_type, headers)
+        if is_success_request(status):
+            return response
+
+
+def invoke_conditional_task(conf, condition, true_task, false_task):
+    """ this will execute conditional task.
+        params:
+        1. conf: conf object
+        2. condition: condition object
+        3. true_task: task to be triggered if condition is true
+        4. false_task: task to be triggered if condition is false
+        """
+    is_valid = jsonLogic(condition, conf, ops)
+
+    if is_valid:
+        return true_task
+    else:
+        return false_task
