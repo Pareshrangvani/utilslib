@@ -180,7 +180,8 @@ def get_session_name(user_access_key, vtiger_url, vtiger_username):
     # get challenge
     headers = {'content-type': 'application/json'}
 
-    challenge_url = '{vtiger_url}/webservice.php?operation=getchallenge&username={vtiger_username}'.format(vtiger_url=vtiger_url, vtiger_username=vtiger_username)
+    challenge_url = '{vtiger_url}/webservice.php?operation=getchallenge&username={vtiger_username}'.format(
+        vtiger_url=vtiger_url, vtiger_username=vtiger_username)
 
     response, status = invoke_http_request(challenge_url, 'GET', headers=headers)
 
@@ -195,7 +196,8 @@ def get_session_name(user_access_key, vtiger_url, vtiger_username):
 
         # login
         login_url = "{vtiger_url}/webservice.php".format(vtiger_url=vtiger_url)
-        payload = 'operation=login&username={vtiger_username}&accessKey={access_key}'.format(access_key=access_key_encoded, vtiger_username=vtiger_username)
+        payload = 'operation=login&username={vtiger_username}&accessKey={access_key}'.format(
+            access_key=access_key_encoded, vtiger_username=vtiger_username)
         headers = {'Content-Type': 'application/x-www-form-urlencoded'}
 
         response, status = invoke_http_request(login_url, 'POST', headers, payload)
@@ -223,15 +225,23 @@ def trigger_workflow(workflow, event_type, data, service_url):
     print("response", response, "status", status)
 
 
-def json_logic_replace_data(rule, data, string_data):
+def json_logic_replace_data(rule, data, string_data=None, json_data=None):
     replace_data = jsonLogic(rule, data)
     it = iter(replace_data)
     res_dct = dict(zip(it, it))
 
-    for key, val in res_dct.items():
-        string_data = string_data.replace(key, str(val))
+    if string_data:
+        for key, val in res_dct.items():
+            string_data = string_data.replace(key, str(val))
 
-    return string_data
+        return string_data
+    elif json_data:
+
+        str_json_data = json.dumps(json_data)
+        for key, val in res_dct.items():
+            str_json_data = str_json_data.replace(key, str(val))
+        json_data = json.loads(str_json_data)
+        return json_data
 
 
 def run_external_workflow(conf, external_workflow_config, vtiger_access):
@@ -271,7 +281,8 @@ def run_external_workflow(conf, external_workflow_config, vtiger_access):
             query = json_logic_replace_data(rule, conf, query)
 
         if vtiger_access.get('user_access_key', ''):
-            session_name = get_session_name(vtiger_access.get('user_access_key'), vtiger_access.get('vtiger_url'), vtiger_access.get('vtiger_username'))
+            session_name = get_session_name(vtiger_access.get('user_access_key'), vtiger_access.get('vtiger_url'),
+                                            vtiger_access.get('vtiger_username'))
             if not session_name:
                 print("unable to get session id from dev server. Please try again")
                 return None
@@ -290,3 +301,134 @@ def run_external_workflow(conf, external_workflow_config, vtiger_access):
         # trigger without condition
         trigger_workflow(workflow, event_type, data, vtiger_access.get('service_url'))
 
+
+def trigger_set_value_task(set_value_fields, conf, rule, session_name, vtiger_access):
+    """   this function will execute revise query on vtiger for setting values
+            params:
+            1.set_value_fields : json object which have list of json payload of values to be set
+            2.conf : conf object
+            3.rule : json logic rule
+            4.session_name : vtiger session
+            3.vtiger_access : json object containing vtiger credentials
+
+            Execution:
+            1. get configs and create query and replace data using json logic.
+            2. execute revise API on vtiger
+            """
+
+    id = conf.get('data').get('id', '')
+    record_module = 'Leads'
+    module = module_id_dict.get(record_module, '')
+    if id and record_module:
+
+        id = module + 'x' + id
+        element = {"id": str(id)}
+
+        for record in set_value_fields:
+            name = record.get('name')
+            type = record.get('type')
+            value = record.get('value')
+
+            if type == 'static' and rule:
+                value = json_logic_replace_data(rule, conf, string_data=value)
+                element[str(name)] = str(value)
+
+            elif type == 'function' and rule:
+                value = json_logic_replace_data(rule, conf, string_data=value)
+                element[str(name)] = str(eval(value))
+
+        # call set value API
+        payload = {'operation': 'revise', 'sessionName': session_name, 'element': json.dumps(element)}
+        url = '{vtiger_url}/webservice.php'.format(vtiger_url=vtiger_access.get('vtiger_url'))
+        headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+        request_type = 'POST'
+
+        response, status = invoke_http_request(url, request_type, headers, payload=payload)
+
+        if status == 200:
+            return response
+        else:
+            print("something went wrong while invoking revise API for set value. status:", status, "response:",
+                  response)
+            return None
+
+
+def invoke_set_value_task(conf, set_value_configs, vtiger_access):
+    """   this function will execute set value task.
+            params:
+            1.conf : conf object
+            2.set_value_configs : conf dictionary containing rule, search_module_object, set_value_fields
+            3.vtiger_access : json object containing vtiger credentials
+
+            Execution:
+            1. get configs and create query and replace data using json logic.
+            2. check if conditions are satisfied using get query.
+            3. call trigger_set_value_task function if conditions are satisfied.
+            """
+
+    set_value_fields = set_value_configs.get('set_value_fields', '')
+    search_module_object = set_value_configs.get('search_module_object', '')
+    rule = set_value_configs.get('rule', '')
+
+    session_name = ''
+    if vtiger_access.get('user_access_key', ''):
+        session_name = get_session_name(vtiger_access.get('user_access_key'), vtiger_access.get('vtiger_url'),
+                                        vtiger_access.get('vtiger_username'))
+        if not session_name:
+            print("unable to get session id from vtiger server. Please try again")
+            return None
+
+    if search_module_object and search_module_object.get('condition_object', ''):
+        condition = buildquery(search_module_object.get('condition_object'))
+
+        module = search_module_object.get('name')
+
+        limit = str(search_module_object.get('fetch_record'), '')
+
+        # prepare query using search_module_object
+
+        order_by = ''
+        if search_module_object.get('sort', ''):
+            order_by = search_module_object.get('sort').get('column') + " " + search_module_object.get('sort').get(
+                'type', "")
+
+        if limit and order_by:
+            query = 'SELECT * FROM {module} WHERE {condition} order by {order_by} LIMIT {limit};'.format(
+                module=module,
+                condition=condition,
+                order_by=order_by,
+                limit=limit)
+        elif limit:
+            query = 'SELECT * FROM {module} WHERE {condition} LIMIT {limit};'.format(
+                module=module,
+                condition=condition,
+                limit=limit)
+        elif order_by:
+            query = 'SELECT * FROM {module} WHERE {condition} order by {order_by};'.format(
+                module=module,
+                condition=condition,
+                order_by=order_by,
+            )
+        else:
+            query = 'SELECT * FROM {module} WHERE {condition};'.format(
+                module=module,
+                condition=condition,
+            )
+
+        query = json_logic_replace_data(rule, conf, string_data=query)
+
+        url = '{vtiger_url}/webservice.php?operation=query&sessionName={sessionName}&query={query}'.format(
+            sessionName=session_name, query=query, vtiger_url=vtiger_access.get('vtiger_url'))
+        headers = {'content-type': 'application/json'}
+        request_type = 'GET'
+        response, status = invoke_http_request(url, request_type, headers)
+
+        if response:
+            if response.get('result') and set_value_fields:
+                set_value_response = trigger_set_value_task(set_value_fields, conf, rule, session_name, vtiger_access)
+                return set_value_response
+
+    elif set_value_fields:
+
+        set_value_response = trigger_set_value_task(set_value_fields, conf, rule, session_name, vtiger_access)
+        return set_value_response
