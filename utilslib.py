@@ -345,7 +345,7 @@ def trigger_set_value_task(set_value_fields, conf, rule, session_name, vtiger_ac
 
         response, status = invoke_http_request(url, request_type, headers, payload=payload)
 
-        if status == 200:
+        if is_success_request(status_code):
             return response
         else:
             print("something went wrong while invoking revise API for set value. status:", status, "response:",
@@ -383,7 +383,7 @@ def invoke_set_value_task(conf, set_value_configs, vtiger_access):
 
         module = search_module_object.get('name')
 
-        limit = str(search_module_object.get('fetch_record'), '')
+        limit = str(search_module_object.get('fetch_record', ''))
 
         # prepare query using search_module_object
 
