@@ -211,14 +211,14 @@ def trigger_workflow(workflow, event_type, data, service_url):
         Required params: 1. workflow 2. event_type 3. data"""
 
     headers = {'content_type': 'application/json'}
-    data['eventtype'] = event_type
 
     endpoint = '{service_url}/api/v1/trigger_external_workflow'.format(service_url=service_url)
 
     if data:
         payload = {
             "workflow": workflow,
-            "data": data
+            "data": data,
+            "eventtype": event_type
         }
 
     response, status = invoke_http_request(endpoint, 'POST', headers, json_data=payload, timeout=61)
@@ -296,10 +296,22 @@ def run_external_workflow(conf, external_workflow_config, vtiger_access):
             if response:
                 # trigger only if condition is satisfied
                 if response.get('result') and workflow and event_type:
-                    trigger_workflow(workflow, event_type, response.get('result')[0], vtiger_access.get('service_url'))
+
+                    if event_type == 'import' or event_type == 'manual':
+                        # if event type = import/ manual then pass list
+
+                        trigger_workflow(workflow, event_type, response.get('result'),
+                                         vtiger_access.get('service_url'))
+                    else:
+                        trigger_workflow(workflow, event_type, response.get('result')[0],
+                                         vtiger_access.get('service_url'))
     elif workflow and event_type and data:
         # trigger without condition
-        trigger_workflow(workflow, event_type, data, vtiger_access.get('service_url'))
+        if event_type == 'import' or event_type == 'manual':
+            list_of_data = [data]
+            trigger_workflow(workflow, event_type, list_of_data, vtiger_access.get('service_url'))
+        else:
+            trigger_workflow(workflow, event_type, data, vtiger_access.get('service_url'))
 
 
 def trigger_set_value_task(set_value_fields, conf, rule, session_name, vtiger_access):
@@ -329,12 +341,14 @@ def trigger_set_value_task(set_value_fields, conf, rule, session_name, vtiger_ac
             type = record.get('type')
             value = record.get('value')
 
-            if type == 'static' and rule:
-                value = json_logic_replace_data(rule, conf, string_data=value)
+            if type == 'static':
+                if rule:
+                    value = json_logic_replace_data(rule, conf, string_data=value)
                 element[str(name)] = str(value)
 
-            elif type == 'function' and rule:
-                value = json_logic_replace_data(rule, conf, string_data=value)
+            elif type == 'function':
+                if rule:
+                    value = json_logic_replace_data(rule, conf, string_data=value)
                 element[str(name)] = str(eval(value))
 
         # call set value API
@@ -415,7 +429,8 @@ def invoke_set_value_task(conf, set_value_configs, vtiger_access):
                 condition=condition,
             )
 
-        query = json_logic_replace_data(rule, conf, string_data=query)
+        if rule:
+            query = json_logic_replace_data(rule, conf, string_data=query)
 
         url = '{vtiger_url}/webservice.php?operation=query&sessionName={sessionName}&query={query}'.format(
             sessionName=session_name, query=query, vtiger_url=vtiger_access.get('vtiger_url'))
@@ -448,11 +463,10 @@ def invoke_web_service_task(conf, web_service_configs):
     rule = web_service_configs.get('rule', '')
     request_object = web_service_configs.get('request_object', '')
 
-    json_logic_replace_data(rule, conf, json_data=request_object)
+    if request_object:
 
-    if request_object and rule:
-
-        request_object = json_logic_replace_data(rule, conf, json_data=request_object)
+        if rule:
+            request_object = json_logic_replace_data(rule, conf, json_data=request_object)
         url = request_object.get("url")
         headers = request_object.get("header")
         request_type = request_object.get("type")
