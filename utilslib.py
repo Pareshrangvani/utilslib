@@ -214,6 +214,10 @@ def trigger_workflow(workflow, event_type, data, service_url):
 
     endpoint = '{service_url}/api/v1/trigger_external_workflow'.format(service_url=service_url)
 
+    print(f"Endpoint: {endpoint}")
+    print(f"Event Type: {event_type}")
+    print(f"Data Type: {data}")
+    print(f"Service URl: {service_url}")
     if data:
         payload = {
             "workflow": workflow,
@@ -258,7 +262,7 @@ def run_external_workflow(conf, external_workflow_config, vtiger_access):
     event_type = external_workflow_config.get('event_type', '')
 
     search_object = external_workflow_config.get('search_object', '')
-
+    print(f"Data: {data} \n Workflow: {workflow} \n Event Type: {event_type} \n Search Object: {search_object}")
     if search_object and search_object.get('condition_object', ''):
         rule = search_object.get('rule', '')
 
@@ -276,7 +280,7 @@ def run_external_workflow(conf, external_workflow_config, vtiger_access):
             limit=limit)
 
         # replace variable name with data using JSON_LOGIC.
-
+        print(f"Query: {query}")
         if rule:
             query = json_logic_replace_data(rule, conf, query)
 
@@ -289,9 +293,12 @@ def run_external_workflow(conf, external_workflow_config, vtiger_access):
 
             url = '{vtiger_url}/webservice.php?operation=query&sessionName={sessionName}&query={query}'.format(
                 sessionName=session_name, query=query, vtiger_url=vtiger_access.get('vtiger_url'))
+            print(f"Url: {url}")
             headers = {'content-type': 'application/json'}
             request_type = 'GET'
             response, status = invoke_http_request(url, request_type, headers)
+
+            print(f"Response: {response}")
 
             if response:
                 # trigger only if condition is satisfied
@@ -328,12 +335,15 @@ def trigger_set_value_task(set_value_fields, conf, rule, session_name, vtiger_ac
             2. execute revise API on vtiger
             """
 
+    print("Inside trigger_set_value_task")
     id = conf.get('data').get('id', '')
     record_module = 'Leads'
     module = module_id_dict.get(record_module, '')
+    print("Id: {}".format(id))
+    print("Module {}".format(module))
     if id and record_module:
 
-        id = module + 'x' + id
+        id = id if "x" in id else module + 'x' + id
         element = {"id": str(id)}
 
         for record in set_value_fields:
@@ -357,8 +367,12 @@ def trigger_set_value_task(set_value_fields, conf, rule, session_name, vtiger_ac
         headers = {'Content-Type': 'application/x-www-form-urlencoded'}
         request_type = 'POST'
 
+        print("Url: {}".format(url))
+        print("Payload: {}".format(payload))
+
         response, status = invoke_http_request(url, request_type, headers, payload=payload)
 
+        print("Response: {}".format(response))
         if is_success_request(status):
             return response
         else:
@@ -380,6 +394,7 @@ def invoke_set_value_task(conf, set_value_configs, vtiger_access):
             3. call trigger_set_value_task function if conditions are satisfied.
             """
 
+    print("Set value task invoked")
     set_value_fields = set_value_configs.get('set_value_fields', '')
     search_module_object = set_value_configs.get('search_module_object', '')
     rule = set_value_configs.get('rule', '')
@@ -388,12 +403,17 @@ def invoke_set_value_task(conf, set_value_configs, vtiger_access):
     if vtiger_access.get('user_access_key', ''):
         session_name = get_session_name(vtiger_access.get('user_access_key'), vtiger_access.get('vtiger_url'),
                                         vtiger_access.get('vtiger_username'))
+        print("Session name: {}".format(session_name))
         if not session_name:
             print("unable to get session id from vtiger server. Please try again")
             return None
 
+    print("Search module object: {}".format(search_module_object))
+    print("Set value fields: {}".format(set_value_fields))
     if search_module_object and search_module_object.get('condition_object', ''):
         condition = buildquery(search_module_object.get('condition_object'))
+
+        print("Condition {}".format(condition))
 
         module = search_module_object.get('name')
 
@@ -434,11 +454,17 @@ def invoke_set_value_task(conf, set_value_configs, vtiger_access):
 
         url = '{vtiger_url}/webservice.php?operation=query&sessionName={sessionName}&query={query}'.format(
             sessionName=session_name, query=query, vtiger_url=vtiger_access.get('vtiger_url'))
+
+        print("URL {}".format(url))
+
         headers = {'content-type': 'application/json'}
         request_type = 'GET'
         response, status = invoke_http_request(url, request_type, headers)
 
+        print("Query Response: ")
+
         if response:
+            print(response)
             if response.get('result') and set_value_fields:
                 set_value_response = trigger_set_value_task(set_value_fields, conf, rule, session_name, vtiger_access)
                 return set_value_response
