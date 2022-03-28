@@ -359,7 +359,7 @@ def trigger_set_value_task(set_value_fields, conf, rule, session_name, vtiger_ac
 
         response, status = invoke_http_request(url, request_type, headers, payload=payload)
 
-        if is_success_request(status_code):
+        if is_success_request(status):
             return response
         else:
             print("something went wrong while invoking revise API for set value. status:", status, "response:",
